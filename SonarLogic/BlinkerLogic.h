@@ -8,19 +8,24 @@
 #ifndef SONARMIDDLEWARE_BLINKERLOGIC_H_
 #define SONARMIDDLEWARE_BLINKERLOGIC_H_
 
+#include "stdint.h"
+#include "memory.h"
 #include "BlinkerDriver.h"
+
+using namespace std;
 
 class BlinkerLogic {
 public:
 	BlinkerLogic();
-	virtual ~BlinkerLogic();
+	virtual ~BlinkerLogic() = default;
 
 	void process();
 private:
 	static const uint16_t delayMillis;
 
-	std::shared_ptr<BlinkerDriver> driver;
 	bool lastState;
+	shared_ptr<BlinkerDriver> driver;
+
 };
 
 #endif /* SONARMIDDLEWARE_BLINKERLOGIC_H_ */

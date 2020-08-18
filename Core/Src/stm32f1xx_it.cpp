@@ -57,9 +57,9 @@
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN EV */
-
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -163,13 +163,7 @@ void DebugMon_Handler(void)
   */
 void EXTI1_IRQHandler(void)
 {
-  /* USER CODE BEGIN EXTI1_IRQn 0 */
-
-  /* USER CODE END EXTI1_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
-  /* USER CODE BEGIN EXTI1_IRQn 1 */
-
-  /* USER CODE END EXTI1_IRQn 1 */
+  EXTI1IrqCallback();
 }
 
 /**
@@ -185,6 +179,20 @@ void TIM1_UP_IRQHandler(void)
 
   /* USER CODE END TIM1_UP_IRQn 1 */
 }
+
+/**
+  * @brief This function handles TIM1 update interrupt.
+  */
+void TIM2_IRQHandler(void)
+{
+	tim2IrqCallback();
+}
+
+void TIM3_IRQHandler(void)
+{
+	tim3IrqCallback();
+}
+
 
 /* USER CODE BEGIN 1 */
 

@@ -10,11 +10,11 @@
 GPIO_TypeDef *BlinkerDriver::blinkerGPIO = GPIOC;
 const uint16_t BlinkerDriver::blinkerPin = GPIO_PIN_13;
 
-std::shared_ptr<BlinkerDriver> BlinkerDriver::instance = nullptr;
+shared_ptr<BlinkerDriver> BlinkerDriver::instance = nullptr;
 
-std::shared_ptr<BlinkerDriver> BlinkerDriver::createBlinker() {
+shared_ptr<BlinkerDriver> BlinkerDriver::createBlinker() {
 	if (instance == nullptr) {
-		instance = std::shared_ptr<BlinkerDriver>(new BlinkerDriver);
+		instance = shared_ptr<BlinkerDriver>(new BlinkerDriver);
 	}
 	return instance;
 }
@@ -28,10 +28,19 @@ void BlinkerDriver::setLightState(BlinkerDriver::LightState state) {
 }
 
 BlinkerDriver::BlinkerDriver() {
-	HAL_GPIO_WritePin(blinkerGPIO, blinkerPin, GPIO_PIN_RESET);
-}
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
 
-BlinkerDriver::~BlinkerDriver() {
-	// TODO Auto-generated destructor stub
-}
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOC_CLK_ENABLE()
+	;
 
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin : PC13 */
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+}

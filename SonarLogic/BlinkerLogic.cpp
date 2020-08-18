@@ -11,12 +11,8 @@
 
 const uint16_t BlinkerLogic::delayMillis = 1000;
 
-BlinkerLogic::BlinkerLogic()
-	: lastState(false) {
-	driver = BlinkerDriver::createBlinker();
-}
-
-BlinkerLogic::~BlinkerLogic() {
+BlinkerLogic::BlinkerLogic() :
+		lastState(false), driver(BlinkerDriver::createBlinker()) {
 }
 
 void BlinkerLogic::process() {
@@ -29,5 +25,4 @@ void BlinkerLogic::process() {
 	}
 	vTaskDelay(delayMillis);
 }
-
 
