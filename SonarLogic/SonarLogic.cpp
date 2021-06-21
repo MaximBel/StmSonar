@@ -15,12 +15,12 @@ string SonarLogic::PULSE_DURATION = "pdur";
 char SonarLogic::indexString[15];
 const uint32_t SonarLogic::SEND_RECEIVE_TICKS_TO_WAIT = 1000;
 
-SonarLogic::SonarLogic(shared_ptr<UltrasonicSensorDriver> sonar,
+SonarLogic::SonarLogic(shared_ptr<UltrasonicSensorDriverWaterproof> sonar,
 		shared_ptr<CommunicatorDriver> communicator) :
 		sonarDriver(sonar), communicatorDriver(communicator) {
 
 	measurementQueueHandle = xQueueCreate(15,
-			sizeof(UltrasonicSensorDriver::measurementResultType));
+			sizeof(UltrasonicSensorDriverWaterproof::measurementResultType));
 
 	/* Create the task, storing the handle. */
 	if (xTaskCreate(processingTaskFunc, "US-logic-process", 128 * 3, this, 24,
@@ -37,7 +37,7 @@ SonarLogic::SonarLogic(shared_ptr<UltrasonicSensorDriver> sonar,
 }
 
 string SonarLogic::serializeData(
-		UltrasonicSensorDriver::measurementResultType result) {
+		UltrasonicSensorDriverWaterproof::measurementResultType result) {
 	auto serializer = make_shared<DataSerializer>();
 
 	uint16_t keyIndex = 0;
@@ -59,7 +59,7 @@ void SonarLogic::processingTaskFunc(void * pvParameters) {
 	auto instance = static_cast<SonarLogic*>(pvParameters);
 
 	for (;;) {
-		UltrasonicSensorDriver::measurementResultType result = nullptr;
+		UltrasonicSensorDriverWaterproof::measurementResultType result = nullptr;
 		if (xQueueReceive(instance->measurementQueueHandle, &result,
 				SEND_RECEIVE_TICKS_TO_WAIT) == pdPASS) {
 			string serializedResult = serializeData(result);
@@ -77,10 +77,10 @@ void SonarLogic::measurementTaskFunc(void * pvParameters) {
 
 	for (;;) {
 		instance->sonarDriver->startMeasurement(8);
-		vTaskDelay(50);
+		vTaskDelay(30);
 		auto result = instance->sonarDriver->stopMeasurement();
 
-		xQueueSend(instance->measurementQueueHandle, &result,
-				SEND_RECEIVE_TICKS_TO_WAIT);
+//		xQueueSend(instance->measurementQueueHandle, &result,
+//				SEND_RECEIVE_TICKS_TO_WAIT);
 	}
 }

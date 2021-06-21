@@ -5,14 +5,14 @@
 #include <memory.h>
 #include "BlinkerLogic.h"
 #include "TimerMicrosecondsDriver.h"
-#include "UltrasonicSensorDriver.h"
+#include "UltrasonicSensorDriverWaterproof.h"
 #include "CommunicatorDriver.h"
 #include "SonarLogic.h"
 
 using namespace std;
 
 static shared_ptr<TimerMicrosInterface> timerMicros = nullptr;
-static shared_ptr<UltrasonicSensorDriver> usDriver = nullptr;
+static shared_ptr<UltrasonicSensorDriverWaterproof> usDriver = nullptr;
 static SonarLogic *sonarLogic = nullptr;
 
 osThreadId_t defaultTaskHandle;
@@ -21,11 +21,11 @@ osThreadAttr_t defaultTask_attributes;
 void SystemClock_Config(void);
 void StartDefaultTask(void *argument);
 
-void tim2IrqCallback() {
-	if (usDriver != nullptr) {
-		usDriver->timReloadCallback();
-	}
-}
+//void tim2IrqCallback() {
+//	if (usDriver != nullptr) {
+//		usDriver->timReloadCallback();
+//	}
+//}
 
 void tim3IrqCallback() {
 	if (timerMicros != nullptr) {
@@ -59,7 +59,7 @@ int main(void) {
 	timerMicros = TimerMicrosecondsDriver::getInstance();
 	timerMicros->start();
 
-	usDriver = UltrasonicSensorDriver::getInstance();
+	usDriver = UltrasonicSensorDriverWaterproof::getInstance();
 	usDriver->setTimerMicros(timerMicros);
 
 	sonarLogic = new SonarLogic(usDriver, CommunicatorDriver::getInstance());

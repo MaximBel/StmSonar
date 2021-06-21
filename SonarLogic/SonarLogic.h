@@ -15,14 +15,14 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-#include "UltrasonicSensorDriver.h"
+#include "UltrasonicSensorDriverWaterproof.h"
 #include "CommunicatorDriver.h"
 
 using namespace std;
 
 class SonarLogic {
 public:
-	SonarLogic(shared_ptr<UltrasonicSensorDriver> sonar,
+	SonarLogic(shared_ptr<UltrasonicSensorDriverWaterproof> sonar,
 			shared_ptr<CommunicatorDriver> communicator);
 	~SonarLogic() = default;
 
@@ -37,14 +37,14 @@ private:
 
 	QueueHandle_t measurementQueueHandle;
 
-	shared_ptr<UltrasonicSensorDriver> sonarDriver;
+	shared_ptr<UltrasonicSensorDriverWaterproof> sonarDriver;
 	shared_ptr<CommunicatorDriver> communicatorDriver;
 
 	static void processingTaskFunc(void * pvParameters);
 	static void measurementTaskFunc(void * pvParameters);
 
 	static string serializeData(
-			UltrasonicSensorDriver::measurementResultType result);
+			UltrasonicSensorDriverWaterproof::measurementResultType result);
 };
 
 #endif /* SONARLOGIC_H_ */

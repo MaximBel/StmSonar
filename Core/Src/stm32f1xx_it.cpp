@@ -185,7 +185,7 @@ void TIM1_UP_IRQHandler(void)
   */
 void TIM2_IRQHandler(void)
 {
-	tim2IrqCallback();
+	//tim2IrqCallback();
 }
 
 void TIM3_IRQHandler(void)
