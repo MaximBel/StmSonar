@@ -37,10 +37,10 @@ public:
 
 	// overloading is better, don't want to use templates due to complexity of
 	// related solutions. could not use to_string, maybe, unsupported.
-	DataSerializer* addDataMember(string dataKey, uint64_t& dataValue);
+	DataSerializer* addDataMember(string dataKey, uint16_t& dataValue);
 	DataSerializer* addDataMember(string dataKey, float& dataValue);
 	DataSerializer* addDataMember(string dataKey, string& dataValue);
-	DataSerializer* addDataMember(string dataKey, vector<uint64_t>& dataValue);
+	DataSerializer* addDataMember(string dataKey, vector<uint16_t>& dataValue);
 	DataSerializer* addDataMember(string dataKey, vector<float>& dataValue);
 	DataSerializer* addDataMember(string dataKey, vector<string>& dataValue);
 

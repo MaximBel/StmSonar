@@ -6,14 +6,11 @@
  */
 
 #include <UltrasonicSensorDriverWaterproof.h>
-#include "portmacro.h"
 #include "vector"
 // TODO: remove this dependency
 #include "main.h"
 #include "string.h"
 #include "handlers.h"
-
-shared_ptr<UltrasonicSensorDriverWaterproof> UltrasonicSensorDriverWaterproof::instance = nullptr;
 
 uint16_t UltrasonicSensorDriverWaterproof::ECHO_PIN = GPIO_PIN_1;
 uint16_t UltrasonicSensorDriverWaterproof::ECHO_LOCK_PIN = GPIO_PIN_2;
@@ -33,7 +30,7 @@ void UltrasonicSensorDriverWaterproof::initGpio() {
 	/*Configure GPIO pin : ECHO_Pin */
 	GPIO_InitStruct.Pin = ECHO_PIN;
 	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 	HAL_GPIO_Init(ECHO_PORT, &GPIO_InitStruct);
 
@@ -58,39 +55,24 @@ void UltrasonicSensorDriverWaterproof::initGpio() {
 
 void UltrasonicSensorDriverWaterproof::trigSensor() {
 	HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_SET);
-	HAL_Delay(1);
+	timerMicros->delayUsec(10);
 	HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);
 }
 
 void UltrasonicSensorDriverWaterproof::resetEchoQueue() {
-	EchoResponceData_t dataElement;
-	while (xQueueReceive(echoQueueHandle, &(dataElement), (TickType_t) 0)
-			== pdPASS) {
-	}
+	resultDataVectorPtr = make_shared<vector<PulseData_t>>();
+	resultDataVectorPtr->reserve(700);
 }
 
-UltrasonicSensorDriverWaterproof::UltrasonicSensorDriverWaterproof() :
-		measurementStartTime(0) {
+UltrasonicSensorDriverWaterproof::UltrasonicSensorDriverWaterproof(shared_ptr<TimerMicrosInterface> timer) :
+		measurementStartTime(0), resultDataVectorPtr(nullptr), timerMicros(timer), nextExpectedType(EXTITriggerTypeRise) {
 	initGpio();
 
-	echoQueueHandle = xQueueCreate(ECHO_QUEUE_COUNT, sizeof(EchoResponceData_t));
+	memset(&pulseData, 0, sizeof(pulseData));
 }
 
 UltrasonicSensorDriverWaterproof::~UltrasonicSensorDriverWaterproof() {
 	// TODO Auto-generated destructor stub
-}
-
-shared_ptr<UltrasonicSensorDriverWaterproof> UltrasonicSensorDriverWaterproof::getInstance() {
-	if (instance == nullptr) {
-		instance = shared_ptr<UltrasonicSensorDriverWaterproof>(
-				new UltrasonicSensorDriverWaterproof);
-	}
-	return instance;
-}
-
-void UltrasonicSensorDriverWaterproof::setTimerMicros(
-		shared_ptr<TimerMicrosInterface> timer) {
-	timerMicros = timer;
 }
 
 void UltrasonicSensorDriverWaterproof::startMeasurement(uint8_t pulseCount) {
@@ -100,95 +82,48 @@ void UltrasonicSensorDriverWaterproof::startMeasurement(uint8_t pulseCount) {
 
 	resetEchoQueue();
 
+	nextExpectedType = EXTITriggerTypeRise;
+	resultDataVectorPtr->clear();
+
 	trigSensor();
+
+	measurementStartTime = timerMicros->getTimeMicros();
 
 	// Not sure I should put it here
 	HAL_NVIC_EnableIRQ(ECHO_EXTI);
-
-	measurementStartTime = timerMicros->getTimeMicros();
 }
 
 UltrasonicSensorDriverWaterproof::measurementResultType UltrasonicSensorDriverWaterproof::stopMeasurement() {
-	auto resultVector = new vector<PulseData_t>;
-	resultVector->reserve(20);
-
 	HAL_NVIC_DisableIRQ(ECHO_EXTI);
 
-	EchoResponceData_t data[120];
-	int index = 0;
-	//PulseData_t pdata[30];
-	//int pindex = 0;
-
-	uint8_t availableDataInQueue = uxQueueMessagesWaiting(echoQueueHandle) - 2;
-
-	// only numbers multiple of 2 are available
-	if (availableDataInQueue % 2 == 0) {
-		EXTITriggerType_t nextExpectedType = EXTITriggerTypeRise;
-		PulseData_t pulseData;
-		uint64_t pulseStartTime = 0;
-
-		while (availableDataInQueue > 0) {
-			EchoResponceData_t dataElement = { 0 };
-			if (xQueueReceive(echoQueueHandle, &(dataElement),
-					(TickType_t) 0) == pdPASS) {
-
-				data[index] = dataElement;
-				index++;
-
-				if (dataElement.type == nextExpectedType) {
-					if (dataElement.type == EXTITriggerTypeFall) {
-						pulseData.duration = dataElement.responceTime
-								- pulseStartTime;
-						//resultVector->push_back(pulseData);
-
-						//pdata[pindex] = pulseData;
-						//pindex++;
-
-						nextExpectedType = EXTITriggerTypeRise;
-					}
-					if (dataElement.type == EXTITriggerTypeRise) {
-						pulseData.timeFromStart = dataElement.responceTime
-								- measurementStartTime;
-						pulseStartTime = dataElement.responceTime;
-
-
-						nextExpectedType = EXTITriggerTypeFall;
-					}
-
-					availableDataInQueue--;
-				} else {
-	//				resultVector->clear();
-	//				break;
-				}
-			} else {
-				resultVector->clear();
-				break;
-			}
-		}
-	} else {
-		resultVector->clear();
-	}
-
-	return resultVector;
+	return resultDataVectorPtr;
 }
 
 void UltrasonicSensorDriverWaterproof::EXTICallback() {
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 	/* EXTI line interrupt detected */
 	if (__HAL_GPIO_EXTI_GET_IT(ECHO_PIN) != 0x00u) {
 		EchoResponceData_t data;
 
-		data.type =
+		EXTITriggerType_t type =
 				HAL_GPIO_ReadPin(ECHO_PORT, ECHO_PIN) == GPIO_PIN_SET ?
 						EXTITriggerTypeRise : EXTITriggerTypeFall;
-		data.responceTime = timerMicros->getTimeMicros();
+		uint32_t responceTime = timerMicros->getTimeMicros() - measurementStartTime;
 
-		xQueueSendFromISR(echoQueueHandle, &data, &xHigherPriorityTaskWoken);
+		if (type == nextExpectedType) {
+			if (type == EXTITriggerTypeFall) {
+				pulseData.duration = responceTime - pulseData.timeFromStart;
+				resultDataVectorPtr->push_back(pulseData);
+
+				nextExpectedType = EXTITriggerTypeRise;
+			}
+			if (type == EXTITriggerTypeRise) {
+				pulseData.timeFromStart = responceTime;
+
+				nextExpectedType = EXTITriggerTypeFall;
+			}
+		}
 
 		__HAL_GPIO_EXTI_CLEAR_IT(ECHO_PIN);
-		HAL_GPIO_EXTI_Callback(ECHO_PIN);
 	}
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 

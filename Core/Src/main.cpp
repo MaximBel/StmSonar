@@ -1,5 +1,4 @@
 #include "main.h"
-#include "cmsis_os.h"
 #include "handlers.h"
 
 #include <memory.h>
@@ -14,9 +13,7 @@ using namespace std;
 static shared_ptr<TimerMicrosInterface> timerMicros = nullptr;
 static shared_ptr<UltrasonicSensorDriverWaterproof> usDriver = nullptr;
 static SonarLogic *sonarLogic = nullptr;
-
-osThreadId_t defaultTaskHandle;
-osThreadAttr_t defaultTask_attributes;
+static BlinkerLogic *blinkerLogic = nullptr;
 
 void SystemClock_Config(void);
 void StartDefaultTask(void *argument);
@@ -41,10 +38,6 @@ void EXTI1IrqCallback() {
 }
 
 int main(void) {
-	defaultTask_attributes.name = "defaultTask";
-	defaultTask_attributes.priority = (osPriority_t) osPriorityNormal;
-	defaultTask_attributes.stack_size = 128 * 4;
-
 	/* MCU Configuration--------------------------------------------------------*/
 
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
@@ -53,28 +46,23 @@ int main(void) {
 	/* Configure the system clock */
 	SystemClock_Config();
 
-	/* Init scheduler */
-	osKernelInitialize();
-
-	timerMicros = TimerMicrosecondsDriver::getInstance();
+	timerMicros = std::make_shared<TimerMicrosecondsDriver>();
 	timerMicros->start();
 
-	usDriver = UltrasonicSensorDriverWaterproof::getInstance();
-	usDriver->setTimerMicros(timerMicros);
+	usDriver = std::make_shared<UltrasonicSensorDriverWaterproof>(timerMicros);
 
-	sonarLogic = new SonarLogic(usDriver, CommunicatorDriver::getInstance());
+	sonarLogic = new SonarLogic(usDriver, std::make_shared<CommunicatorDriver>(), timerMicros);
 
-	/* Create the thread(s) */
-	/* creation of defaultTask */
-	defaultTaskHandle = osThreadNew(StartDefaultTask, NULL,
-			&defaultTask_attributes);
-
-	/* Start scheduler */
-	osKernelStart();
+	blinkerLogic = new BlinkerLogic(timerMicros);
 
 	/* We should never get here as control is now taken by the scheduler */
 	/* Infinite loop */
+
+	auto timestamp = timerMicros->getTimeMicros();
 	while (1) {
+		sonarLogic->process();
+		blinkerLogic->process();
+		timerMicros->delayUntilUsec(timestamp, 50000);
 	}
 }
 
@@ -106,14 +94,6 @@ void SystemClock_Config(void) {
 
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
 		Init_Error_Handler();
-	}
-}
-
-void StartDefaultTask(void *argument) {
-	BlinkerLogic blinkerLogic = BlinkerLogic();
-	/* Infinite loop */
-	for (;;) {
-		blinkerLogic.process();
 	}
 }
 

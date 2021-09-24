@@ -11,20 +11,25 @@
 #include "stdint.h"
 #include "memory.h"
 #include "BlinkerDriver.h"
+#include "TimerMicrosInterface.h"
 
 using namespace std;
 
 class BlinkerLogic {
 public:
-	BlinkerLogic();
+	BlinkerLogic(shared_ptr<TimerMicrosInterface> timer);
 	virtual ~BlinkerLogic() = default;
 
 	void process();
 private:
-	static const uint16_t delayMillis;
+	static const uint32_t delayMicros;
 
+	uint64_t lastUpdateTime;
 	bool lastState;
 	shared_ptr<BlinkerDriver> driver;
+	shared_ptr<TimerMicrosInterface> timerDriver;
+
+	bool isTimeToUpdate();
 
 };
 

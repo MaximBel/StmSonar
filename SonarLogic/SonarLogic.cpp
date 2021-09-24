@@ -14,26 +14,49 @@ string SonarLogic::PULSE_START_TIME = "pstart";
 string SonarLogic::PULSE_DURATION = "pdur";
 char SonarLogic::indexString[15];
 const uint32_t SonarLogic::SEND_RECEIVE_TICKS_TO_WAIT = 1000;
+uint8_t SonarLogic::preambleData[] = { 0x45, 0x43, 0x48, 0xF4, 0x50, 0x52, 0x45 };
+
+uint16_t SonarLogic::calcCrc16(uint8_t *pcBlock, uint16_t len) {
+	uint16_t crc = 0xFFFF;
+
+    while (len--) {
+        crc ^= *pcBlock++ << 8;
+
+        for (uint8_t i = 0; i < 8; i++) {
+            crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+        }
+    }
+    return crc;
+}
 
 SonarLogic::SonarLogic(shared_ptr<UltrasonicSensorDriverWaterproof> sonar,
-		shared_ptr<CommunicatorDriver> communicator) :
-		sonarDriver(sonar), communicatorDriver(communicator) {
+		shared_ptr<CommunicatorDriver> communicator, shared_ptr<TimerMicrosInterface> timer) :
+		sonarDriver(sonar), communicatorDriver(communicator), timerDriver(timer) {
+}
 
-	measurementQueueHandle = xQueueCreate(15,
-			sizeof(UltrasonicSensorDriverWaterproof::measurementResultType));
+uint8_t *SonarLogic::packData(UltrasonicSensorDriverWaterproof::measurementResultType result, uint16_t *resultDataSize) {
+	uint16_t dataCount = result->size();
+	uint16_t sizeOfArray = dataCount * sizeof(UltrasonicSensorDriverWaterproof::PulseData_t) + sizeof(preambleData) + sizeof(dataCount) + 2;
+	auto returnArray = new uint8_t[sizeOfArray];
 
-	/* Create the task, storing the handle. */
-	if (xTaskCreate(processingTaskFunc, "US-logic-process", 128 * 3, this, 24,
-			&processingTaskHandle) != pdPASS) {
-		Init_Error_Handler();
+	dataCount = dataCount | 0xFF00;
+
+	memcpy(returnArray, preambleData, sizeof(preambleData));
+	memcpy(returnArray + sizeof(preambleData), &dataCount, sizeof(dataCount));
+
+	uint16_t dataIndex = sizeof(preambleData) + sizeof(dataCount);
+	for (UltrasonicSensorDriverWaterproof::PulseData_t element : *result) {
+		memcpy(&returnArray[dataIndex], &element, sizeof(element));
+		dataIndex += sizeof(element);
 	}
 
-	/* Create the task, storing the handle. */
-	if (xTaskCreate(measurementTaskFunc, "US-logic-measure", 128 * 3, this, 24,
-			&measurementTaskHandle) != pdPASS) {
-		Init_Error_Handler();
-	}
+	auto crc = calcCrc16(returnArray, sizeOfArray - 2);
 
+	memcpy(&returnArray[sizeOfArray - 2], &crc, sizeof(crc));
+
+	*resultDataSize = sizeOfArray;
+
+	return returnArray;
 }
 
 string SonarLogic::serializeData(
@@ -55,32 +78,37 @@ string SonarLogic::serializeData(
 	return serializer->serializeData();
 }
 
-void SonarLogic::processingTaskFunc(void * pvParameters) {
-	auto instance = static_cast<SonarLogic*>(pvParameters);
+#include "vector"
 
-	for (;;) {
-		UltrasonicSensorDriverWaterproof::measurementResultType result = nullptr;
-		if (xQueueReceive(instance->measurementQueueHandle, &result,
-				SEND_RECEIVE_TICKS_TO_WAIT) == pdPASS) {
-			string serializedResult = serializeData(result);
-			delete result;
+void SonarLogic::process() {
+	uint16_t returnDataSize = 0;
 
-			instance->communicatorDriver->sendData(
-					reinterpret_cast<const uint8_t *>(serializedResult.c_str()),
-					strlen(serializedResult.c_str()));
-		}
-	}
-}
+	sonarDriver->startMeasurement(8);
+	timerDriver->delayUsec(50000);
+	uint8_t *outputData = packData(sonarDriver->stopMeasurement(), &returnDataSize);
+//	sonarDriver->stopMeasurement();
+//
+//	auto resultDataVectorPtr = std::make_shared<std::vector<UltrasonicSensorDriverWaterproof::PulseData_t>>();
+//
+//	UltrasonicSensorDriverWaterproof::PulseData_t data;
+//
+//	data.duration = 0xFAFA;
+//	data.timeFromStart = 0xBDBD;
+//
+//	resultDataVectorPtr->push_back(data);
+//	resultDataVectorPtr->push_back(data);
+//
+//	uint8_t * outputData = packData(resultDataVectorPtr, &returnDataSize);
 
-void SonarLogic::measurementTaskFunc(void * pvParameters) {
-	auto instance = static_cast<SonarLogic*>(pvParameters);
+//	uint64_t time = timerDriver->getTimeMicros();
 
-	for (;;) {
-		instance->sonarDriver->startMeasurement(8);
-		vTaskDelay(30);
-		auto result = instance->sonarDriver->stopMeasurement();
+	communicatorDriver->sendData(outputData, returnDataSize);
 
-//		xQueueSend(instance->measurementQueueHandle, &result,
-//				SEND_RECEIVE_TICKS_TO_WAIT);
-	}
+	//uint64_t delta = timerDriver->getTimeMicros() - time;
+
+//	if (delta > 100000) {
+//		asm("NOP");
+//	}
+
+	delete[] outputData;
 }

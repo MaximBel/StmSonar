@@ -22,6 +22,7 @@ using namespace std;
 
 class TimerMicrosecondsDriver: public TimerMicrosInterface {
 public:
+	TimerMicrosecondsDriver();
 	virtual ~TimerMicrosecondsDriver() = default;
 
 	static std::shared_ptr<TimerMicrosecondsDriver> getInstance();
@@ -30,10 +31,12 @@ public:
 
 	void start() override;
 
+	void delayUsec(uint64_t delay) override;
+	void delayUntilUsec(uint64_t &startMoment, uint64_t delay) override;
+
 	void timReloadCallback();
 
 private:
-	static std::shared_ptr<TimerMicrosecondsDriver> instance;
 	static TIM_TypeDef *TIMER_INSTANCE;
 
 	uint64_t reloadCounter;
@@ -43,9 +46,6 @@ private:
 	SemaphoreHandle_t mutex;
 
 	void initTim();
-
-	TimerMicrosecondsDriver();
-
 };
 
 #endif /* SONARDRIVERS_TIMERMICROSECONDSDRIVER_H_ */

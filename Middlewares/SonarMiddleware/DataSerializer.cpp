@@ -17,8 +17,8 @@ shared_ptr<map<string, string>> SerialData::getMap() {
 }
 
 DataSerializer* DataSerializer::addDataMember(string dataKey,
-		uint64_t& dataValue) {
-	sprintf(tempDataString, "%" PRIu64 "", (unsigned long long) dataValue);
+		uint16_t& dataValue) {
+	sprintf(tempDataString, "%" PRIu16 "", (unsigned) dataValue);
 	serialData->addKey(dataKey, string(tempDataString));
 	return this;
 }
@@ -37,13 +37,13 @@ DataSerializer* DataSerializer::addDataMember(string dataKey,
 }
 
 DataSerializer* DataSerializer::addDataMember(string dataKey,
-		vector<uint64_t>& dataValue) {
+		vector<uint16_t>& dataValue) {
 	uint32_t length = 0;
 
 	length += sprintf(tempDataString + length, "[");
 	for (auto element : dataValue) {
-		length += sprintf(tempDataString + length, "%" PRIu64 ",",
-				(unsigned long long) element);
+		length += sprintf(tempDataString + length, "%" PRIu16 ",",
+				(unsigned) element);
 	}
 	sprintf(tempDataString + length, "]");
 	serialData->addKey(dataKey, string(tempDataString));

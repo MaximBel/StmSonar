@@ -11,14 +11,11 @@
 // TODO: remove this dependency
 #include "main.h"
 
-shared_ptr<TimerMicrosecondsDriver> TimerMicrosecondsDriver::instance = nullptr;
 TIM_TypeDef *TimerMicrosecondsDriver::TIMER_INSTANCE = TIM3;
 
 TimerMicrosecondsDriver::TimerMicrosecondsDriver() :
 		reloadCounter(0) {
 	htim = {0};
-
-	mutex = xSemaphoreCreateMutex();
 
 	initTim();
 }
@@ -50,20 +47,10 @@ void TimerMicrosecondsDriver::initTim() {
 	HAL_TIM_MspPostInit(&htim);
 }
 
-shared_ptr<TimerMicrosecondsDriver> TimerMicrosecondsDriver::getInstance() {
-	if (instance == nullptr) {
-		instance = shared_ptr<TimerMicrosecondsDriver>(
-				new TimerMicrosecondsDriver);
-	}
-	return instance;
-}
-
 uint64_t TimerMicrosecondsDriver::getTimeMicros() {
 	uint64_t currentTime = 0;
-	//xSemaphoreTake(mutex, portMAX_DELAY);
 	// TODO: think about atomic
 	currentTime = reloadCounter * 0xFFFF + htim.Instance->CNT;
-	//xSemaphoreGive(mutex);
 	return currentTime;
 }
 
@@ -71,18 +58,27 @@ void TimerMicrosecondsDriver::start() {
 	HAL_TIM_Base_Start_IT(&htim);
 }
 
-void TimerMicrosecondsDriver::timReloadCallback() {
-	//static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+void TimerMicrosecondsDriver::delayUsec(uint64_t delay) {
+	auto currentTime = getTimeMicros();
 
-	//xSemaphoreTakeFromISR(mutex, &xHigherPriorityTaskWoken);
+	while (getTimeMicros() < (currentTime + delay)) {}
+
+}
+void TimerMicrosecondsDriver::delayUntilUsec(uint64_t &startMoment, uint64_t delay) {
+	auto currentTime = startMoment;
+
+	while (getTimeMicros() < (currentTime + delay)) {}
+
+	startMoment = getTimeMicros();
+// TODO: add check for time overflow
+}
+
+void TimerMicrosecondsDriver::timReloadCallback() {
 	reloadCounter++;
-	//xSemaphoreGiveFromISR(mutex, &xHigherPriorityTaskWoken);
 
 	if (__HAL_TIM_GET_FLAG(&htim, TIM_FLAG_UPDATE) != RESET) {
 		if (__HAL_TIM_GET_IT_SOURCE(&htim, TIM_IT_UPDATE) != RESET) {
 			__HAL_TIM_CLEAR_IT(&htim, TIM_IT_UPDATE);
 		}
 	}
-
-	//portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }

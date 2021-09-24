@@ -27,22 +27,21 @@ public:
 	} EXTITriggerType_t;
 
 	typedef struct {
-		uint64_t responceTime;
+		uint16_t responceTime;
 		EXTITriggerType_t type;
 	} EchoResponceData_t;
 
-	typedef struct {
-		uint64_t timeFromStart;
-		uint64_t duration;
-	} PulseData_t;
+#pragma pack(push, 1)
+    typedef struct {
+        uint16_t timeFromStart;
+        uint16_t duration;
+    } PulseData_t;
+#pragma pack(pop)
 
-	using measurementResultType = vector<PulseData_t>*;
+	using measurementResultType = shared_ptr<vector<PulseData_t>>;
 
+	UltrasonicSensorDriverWaterproof(shared_ptr<TimerMicrosInterface> timer);
 	virtual ~UltrasonicSensorDriverWaterproof();
-
-	static shared_ptr<UltrasonicSensorDriverWaterproof> getInstance();
-
-	void setTimerMicros(shared_ptr<TimerMicrosInterface> timer);
 
 	/**
 	 * @param waitTime time in microseconds
@@ -56,7 +55,6 @@ public:
 	void EXTICallback();
 
 private:
-	static shared_ptr<UltrasonicSensorDriverWaterproof> instance;
 	static uint16_t ECHO_PIN;
 	static uint16_t ECHO_LOCK_PIN;
 	static GPIO_TypeDef *ECHO_PORT;
@@ -72,11 +70,13 @@ private:
 
 	uint64_t measurementStartTime;
 
-	QueueHandle_t echoQueueHandle;
+	shared_ptr<vector<PulseData_t>> resultDataVectorPtr;
 
 	shared_ptr<TimerMicrosInterface> timerMicros;
 
-	UltrasonicSensorDriverWaterproof();
+	EXTITriggerType_t nextExpectedType;
+	PulseData_t pulseData;
+
 	void initGpio();
 
 	void trigSensor();

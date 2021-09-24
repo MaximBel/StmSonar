@@ -9,13 +9,17 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-const uint16_t BlinkerLogic::delayMillis = 1000;
+const uint32_t BlinkerLogic::delayMicros = 1000000;
 
-BlinkerLogic::BlinkerLogic() :
-		lastState(false), driver(BlinkerDriver::createBlinker()) {
+BlinkerLogic::BlinkerLogic(shared_ptr<TimerMicrosInterface> timer) :
+		lastUpdateTime(0), lastState(false), driver(BlinkerDriver::createBlinker()), timerDriver(timer) {
 }
 
 void BlinkerLogic::process() {
+	if (!isTimeToUpdate()) {
+		return;
+	}
+
 	if (lastState == false) {
 		driver->setLightState(BlinkerDriver::LightState_Enable);
 		lastState = true;
@@ -23,6 +27,13 @@ void BlinkerLogic::process() {
 		driver->setLightState(BlinkerDriver::LightState_Disable);
 		lastState = false;
 	}
-	vTaskDelay(delayMillis);
+}
+
+bool BlinkerLogic::isTimeToUpdate() {
+	if (timerDriver->getTimeMicros() - lastUpdateTime > delayMicros) {
+		lastUpdateTime = timerDriver->getTimeMicros();
+		return true;
+	}
+	return false;
 }
 
